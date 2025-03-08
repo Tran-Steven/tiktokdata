@@ -1,23 +1,23 @@
 name: setup-node
-description: "Setup Node.js ⚙️ - Cache dependencies ⚡ - Install dependencies 🔧"
+description: "Setup Node.js - Cache dependencies - Install dependencies"
 inputs: {}
 outputs: {}
 runs:
-  using: "composite"
+  using: composite
   steps:
-    - name: Setup Node.js ⚙️
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
 
-    - name: Cache dependencies ⚡
+    - name: Cache dependencies
       id: cache_dependencies
       uses: actions/cache@v3
       with:
         path: node_modules
         key: ${{ runner.os }}-node-modules
 
-    - name: Install dependencies 🔧
+    - name: Install dependencies
       if: steps.cache_dependencies.outputs.cache-hit != 'true'
       run: npm install
       shell: bash
