@@ -1,4 +1,5 @@
 name: publish-to-github-pages
+
 on:
   push:
     branches:
@@ -22,6 +23,7 @@ jobs:
 
       - name: Setup Node.js ⚙️ - Cache dependencies ⚡ - Install dependencies 🔧
         uses: ./.github/actions/setup-node
+        # ^ references the composite action in .github/actions/setup-node/action.yml
 
       - name: Setup Pages ⚙️
         uses: actions/configure-pages@v4
