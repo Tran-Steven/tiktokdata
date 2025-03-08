@@ -1,8 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: "/tiktok-data",
-  output: "export",
   reactStrictMode: true,
+  output: "export",
+
+  basePath: "/tiktok-data",
+
+
+  assetPrefix: "/tiktok-data",
+  images: {
+    unoptimized: true,
+  },
 };
 
 module.exports = nextConfig;
