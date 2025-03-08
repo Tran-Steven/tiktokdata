@@ -83,7 +83,14 @@ export default function TikTokDMViewer() {
         <p className="text-gray-500 mt-6 text-center">No messages found</p>
       );
     }
-    return filtered.map(([u, c], i) => (
+
+    const sorted = [...filtered].sort((a, b) => {
+      const aLast = a[1][a[1].length - 1]?.Date || "";
+      const bLast = b[1][b[1].length - 1]?.Date || "";
+      return new Date(bLast).getTime() - new Date(aLast).getTime();
+    });
+
+    return sorted.map(([u, c], i) => (
       <div
         key={i}
         className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer"
