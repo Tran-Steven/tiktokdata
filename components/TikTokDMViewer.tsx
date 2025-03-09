@@ -24,7 +24,8 @@ function isTikTokLink(url: string) {
   const lower = url.trim().toLowerCase();
   return (
     lower.startsWith("https://www.tiktok") ||
-    lower.startsWith("https://www.tiktokv")
+    lower.startsWith("https://www.tiktokv") ||
+    lower.startsWith("https://m.tiktok")
   );
 }
 
@@ -35,7 +36,9 @@ export default function TikTokDMViewer() {
   const [fileName, setFileName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inboxContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selectedChat && chatContainerRef.current) {
@@ -188,8 +191,8 @@ export default function TikTokDMViewer() {
           </div>
         </div>
         <div
-          className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f8f8f8]"
           ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f8f8f8]"
         >
           {arr.map((msg, i) => {
             const isUser = msg.From !== selectedChat;
@@ -352,14 +355,19 @@ export default function TikTokDMViewer() {
   }, [selectedChat, messages]);
 
   function handleInboxClick() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Force jump to top (no smooth)
+    if (inboxContainerRef.current) {
+      inboxContainerRef.current.scrollTop = 0;
+    }
+    // If you'd rather try smooth scrolling:
+    // inboxContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col items-center w-full max-w-md mx-auto relative">
       {!selectedChat && (
         <>
-          <div className="relative h-14 w-full border-b border-gray-200">
+          <div className="relative h-14 w-full border-b border-gray-200 flex-none">
             <div
               className={`absolute inset-0 flex items-center transition-all duration-300 ${
                 isSearching ? "opacity-0 pointer-events-none" : "opacity-100"
@@ -411,12 +419,28 @@ export default function TikTokDMViewer() {
               </svg>
             </div>
           </div>
-          <div className="flex-1 w-full overflow-y-auto">{inboxList}</div>
+
+          {/*
+            This is the scrollable inbox area.
+            We force a fixed height so it actually can scroll.
+            h-[calc(100vh-3.5rem-4rem)] => for example:
+            - 3.5rem might be your header height
+            - 4rem might be your bottom bar
+            Adjust to suit your own layout or screen design
+          */}
+          <div
+            ref={inboxContainerRef}
+            className="overflow-y-auto w-full flex-grow h-[calc(100vh-3.5rem-4rem)]"
+          >
+            {inboxList}
+          </div>
         </>
       )}
+
       {selectedChat && chatView}
+
       {!selectedChat && (
-        <div className="sticky bottom-0 flex justify-center w-full max-w-md mx-auto bg-white border-t border-gray-200 h-16">
+        <div className="w-full max-w-md mx-auto bg-white border-t border-gray-200 flex-none h-16 sticky bottom-0 flex justify-center items-center">
           <div
             className="flex flex-col items-center justify-center cursor-pointer"
             onClick={handleInboxClick}
@@ -437,6 +461,7 @@ export default function TikTokDMViewer() {
           </div>
         </div>
       )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="w-11/12 max-w-sm p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center text-center">
@@ -454,7 +479,6 @@ export default function TikTokDMViewer() {
                 View Code Repository and Privacy
               </a>
             </p>
-
             <div className="relative w-full border-2 border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
               <input
                 type="file"
