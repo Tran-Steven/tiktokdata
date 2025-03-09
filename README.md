@@ -1,9 +1,15 @@
 # TikTok Data DM
 
-Import your TikTok JSON Data and display your DM Conversations in a TikTok like UI.
+Import your TikTok JSON Data and display your DM Conversations in a TikTok-like UI.
 
-Currently TikTok's data is missing some information. When you send a TikTok along with a message, it only contains the TikTok message, but not the TikTok video attached. So some of your DM conversations may look odd. This is the reason and there's no real fix unless TikTok updates what is in their JSON Data.
+## Data Limitations
+
+TikTok's exported data has some constraints. When a TikTok video is shared in a DM, the JSON file only contains the message text, not the attached video. As a result, some conversations may appear incomplete or out of context. This is due to TikTok’s data structure, and there is no fix unless TikTok includes this information in future exports.
 
 ## Privacy
 
-No data is collected, and everything is stored locally. The website takes in the JSON file and parses out the conversations to display the information.
+Your data is **never** collected. Everything is processed and stored locally on your device. The website simply parses the imported JSON file and formats the conversations for display—nothing is uploaded or shared.
+
+## Issues & Features
+Create an issue in the [Issues section](https://github.com/Tran-Steven/tiktokdata/issues) describing the bug or feature.
+
