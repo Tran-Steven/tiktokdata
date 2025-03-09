@@ -35,7 +35,6 @@ export default function TikTokDMViewer() {
   const [fileName, setFileName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,9 +57,9 @@ export default function TikTokDMViewer() {
           data?.["Direct Message"]?.["Direct Messages"]?.["ChatHistory"];
         if (!chats) throw new Error();
         const cleaned: ChatData = {};
-        Object.entries(chats).forEach(([key, val]) => {
-          const user = key.replace(/^Chat History with /, "").replace(/:$/, "");
-          cleaned[user] = val as ChatMessage[];
+        Object.entries(chats).forEach(([k, v]) => {
+          const user = k.replace(/^Chat History with /, "").replace(/:$/, "");
+          cleaned[user] = v as ChatMessage[];
         });
         setMessages(cleaned);
         setFileName(file.name);
@@ -100,11 +99,10 @@ export default function TikTokDMViewer() {
   }, [messages, searchTerm]);
 
   const inboxList = useMemo(() => {
-    if (!messages || filtered.length === 0) {
+    if (!messages || filtered.length === 0)
       return (
         <p className="text-gray-500 mt-6 text-center">No messages found</p>
       );
-    }
     const sorted = [...filtered].sort((a, b) => {
       const aLast = a[1][a[1].length - 1]?.Date || "";
       const bLast = b[1][b[1].length - 1]?.Date || "";
@@ -176,16 +174,7 @@ export default function TikTokDMViewer() {
               fill="#000000"
               viewBox="0 0 65.456 65.456"
             >
-              <path
-                d="M57.427,5.031C53.76,1.646,49.895,0,45.611,0c-5.052,0-9.663,2.314-14.123,4.553
-                 c-4.012,2.014-7.801,3.916-11.432,3.916c-2.742,0-5.203-1.092-7.745-3.438c-0.875-0.808-2.146-1.021-3.238-0.543
-                 c-1.023,0.448-1.698,1.425-1.78,2.526c-0.147,0.354-0.23,0.742-0.23,1.149v54.293c0,1.657,1.343,3,3,3s3-1.343,3-3V44.807
-                 c2.222,1.1,4.536,1.66,6.992,1.66c0,0,0.001,0,0.002,0c5.051-0.001,9.662-2.314,14.122-4.553c4.013-2.014,7.803-3.915,11.434-3.915
-                 c2.742,0,5.203,1.092,7.744,3.438c0.875,0.81,2.146,1.023,3.238,0.544c1.092-0.478,1.797-1.557,1.797-2.748V7.235
-                 C58.392,6.397,58.042,5.599,57.427,5.031z M52.392,33.534C50.236,32.506,47.989,32,45.613,32c-5.052,0-9.664,2.314-14.125,4.553
-                 c-4.012,2.013-7.801,3.914-11.431,3.915h-0.001c-2.393,0-4.572-0.833-6.778-2.605V12.934c2.156,1.029,4.403,1.535,6.779,1.535
-                 c5.052,0,9.664-2.314,14.123-4.553C38.192,7.902,41.982,6,45.612,6c2.395,0,4.574,0.833,6.78,2.605V33.534z"
-              />
+              <path d="M57.427,5.031C53.76,1.646,49.895,0,45.611,0c-5.052,0-9.663,2.314-14.123,4.553c-4.012,2.014-7.801,3.916-11.432,3.916c-2.742,0-5.203-1.092-7.745-3.438c-0.875-0.808-2.146-1.021-3.238-0.543c-1.023,0.448-1.698,1.425-1.78,2.526c-0.147,0.354-0.23,0.742-0.23,1.149v54.293c0,1.657,1.343,3,3,3s3-1.343,3-3V44.807c2.222,1.1,4.536,1.66,6.992,1.66c0,0,0.001,0,0.002,0c5.051-0.001,9.662-2.314,14.122-4.553c4.013-2.014,7.803-3.915,11.434-3.915c2.742,0,5.203,1.092,7.744,3.438c0.875,0.81,2.146,1.023,3.238,0.544c1.092-0.478,1.797-1.557,1.797-2.748V7.235C58.392,6.397,58.042,5.599,57.427,5.031z M52.392,33.534C50.236,32.506,47.989,32,45.613,32c-5.052,0-9.664,2.314-14.125,4.553c-4.012,2.013-7.801,3.914-11.431,3.915h-0.001c-2.393,0-4.572-0.833-6.778-2.605V12.934c2.156,1.029,4.403,1.535,6.779,1.535c5.052,0,9.664-2.314,14.123-4.553C38.192,7.902,41.982,6,45.612,6c2.395,0,4.574,0.833,6.78,2.605V33.534z" />
             </svg>
             <svg
               className="w-6 h-6 text-black cursor-pointer"
@@ -208,7 +197,6 @@ export default function TikTokDMViewer() {
             const bubbleColor = isUser
               ? "bg-[#1092d6] text-white"
               : "bg-white text-black";
-
             if (isBracketedGifLink(msg.Content)) {
               const link = extractLinkFromBracketed(msg.Content);
               return (
@@ -241,7 +229,6 @@ export default function TikTokDMViewer() {
                 </div>
               );
             }
-
             if (isLink(msg.Content)) {
               if (isTikTokLink(msg.Content)) {
                 return (
@@ -289,7 +276,6 @@ export default function TikTokDMViewer() {
                   </div>
                 );
               }
-
               return (
                 <div key={i} className={`flex items-end gap-2 ${side}`}>
                   {!isUser && (
@@ -327,7 +313,6 @@ export default function TikTokDMViewer() {
                 </div>
               );
             }
-
             return (
               <div key={i} className={`flex items-end gap-2 ${side}`}>
                 {!isUser && (
@@ -430,8 +415,6 @@ export default function TikTokDMViewer() {
         </>
       )}
       {selectedChat && chatView}
-
-      {/* FOOTER */}
       {!selectedChat && (
         <div className="sticky bottom-0 flex justify-center w-full max-w-md mx-auto bg-white border-t border-gray-200 h-16">
           <div
@@ -445,22 +428,33 @@ export default function TikTokDMViewer() {
               className="w-8 h-8 pb-3 text-black"
             >
               <path d="M60.66,39.31H29.341c-2.063,0-3.735-1.672-3.735-3.735c0-2.063,1.672-3.735,3.735-3.735H60.66 c2.062,0,3.735,1.672,3.735,3.735C64.395,37.638,62.722,39.31,60.66,39.31z" />
-              <path d="M45,90c-0.991,0-1.94-0.394-2.64-1.094L24.603,71.15H5.853 c-2.063,0-3.735-1.673-3.735-3.735V3.735C2.118,1.672,3.79,0,5.853,0h78.294 c2.062,0,3.735,1.672,3.735,3.735v63.681c0,2.062-1.673,3.735-3.735,3.735H65.397 L47.64,88.906C46.94,89.606,45.991,90,45,90z M9.587,63.681h16.564c0.991,0,1.94,0.394,2.64,1.094L45,80.985l16.21-16.21 c0.7-0.7,1.651-1.094,2.64-1.094h16.562V7.469H9.587v56.212z" />
+              <path
+                fill="black"
+                d="M45,90c-0.991,0-1.94-0.394-2.64-1.094L24.603,71.15H5.853 c-2.063,0-3.735-1.673-3.735-3.735V3.735C2.118,1.672,3.79,0,5.853,0h78.294 c2.062,0,3.735,1.672,3.735,3.735v63.681c0,2.062-1.673,3.735-3.735,3.735H65.397 L47.64,88.906C46.94,89.606,45.991,90,45,90z M9.587,63.681h16.564c0.991,0,1.94,0.394,2.64,1.094L45,80.985l16.21-16.21 c0.7-0.7,1.651-1.094,2.64-1.094h16.562V7.469H9.587v56.212z"
+              />
             </svg>
             <span className="text-base text-black -mt-2">Inbox</span>
           </div>
         </div>
       )}
-
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="w-11/12 max-w-sm p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center text-center">
             <h2 className="text-xl font-bold mb-2">
-              Upload Your TikTok DM JSON File
+              Upload Your TikTok Data JSON File
             </h2>
             <p className="text-gray-500 text-sm mb-4">
               We never store your data — it stays local.
+              <br />
+              <a
+                className="text-blue-300"
+                href="https://github.com/Tran-Steven/tiktokdata"
+                target="_blank"
+              >
+                View Code Repository and Privacy
+              </a>
             </p>
+
             <div className="relative w-full border-2 border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
               <input
                 type="file"
