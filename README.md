@@ -2,10 +2,12 @@
 
 Import your TikTok JSON Data and display your DM Conversations in a TikTok-like UI.
 
-Once you have your data JSON file, simply input the file into the app.
+
 # How To Use
 
 Please follow [TikTok's Guide](https://support.tiktok.com/en/account-and-privacy/personalized-ads-and-data/requesting-your-data) on how to request your data and make sure to select the JSON option.
+
+Once you have your data JSON file, simply input the file into the app.
 
 ## Data Limitations
 
