@@ -35,15 +35,14 @@ export default function TikTokDMViewer() {
   const [fileName, setFileName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selectedChat && chatContainerRef.current) {
       setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop =
-            chatContainerRef.current.scrollHeight;
-        }
+        chatContainerRef.current!.scrollTop =
+          chatContainerRef.current!.scrollHeight;
       }, 100);
     }
   }, [selectedChat, messages]);
@@ -367,6 +366,10 @@ export default function TikTokDMViewer() {
     );
   }, [selectedChat, messages]);
 
+  function handleInboxClick() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="min-h-screen bg-white text-black flex flex-col items-center w-full max-w-md mx-auto relative">
       {!selectedChat && (
@@ -427,29 +430,28 @@ export default function TikTokDMViewer() {
         </>
       )}
       {selectedChat && chatView}
-      <div className="sticky bottom-0 flex justify-center w-full max-w-md mx-auto bg-white border-t border-gray-200 h-16">
-        <div className="flex flex-col items-center justify-center">
-          <svg
-            viewBox="0 0 90 90"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="currentColor"
-            className="w-8 h-8 pb-3 text-black"
-          >
-            <path
-              d="M60.66,39.31H29.341c-2.063,0-3.735-1.672-3.735-3.735c0-2.063,1.672-3.735,3.735-3.735H60.66
-    c2.062,0,3.735,1.672,3.735,3.735C64.395,37.638,62.722,39.31,60.66,39.31z"
-            />
-            <path
-              d="M45,90c-0.991,0-1.94-0.394-2.64-1.094L24.603,71.15H5.853c-2.063,0-3.735-1.673-3.735-3.735V3.735
-    C2.118,1.672,3.79,0,5.853,0h78.294c2.062,0,3.735,1.672,3.735,3.735v63.681c0,2.062-1.673,3.735-3.735,3.735H65.397L47.64,88.906
-    C46.94,89.606,45.991,90,45,90z M9.587,63.681h16.564c0.991,0,1.94,0.394,2.64,1.094L45,80.985l16.21-16.21
-    c0.7-0.7,1.651-1.094,2.64-1.094h16.562V7.469H9.587V63.681z"
-            />
-          </svg>
 
-          <span className="text-base text-black -mt-2">Inbox</span>
+      {/* FOOTER */}
+      {!selectedChat && (
+        <div className="sticky bottom-0 flex justify-center w-full max-w-md mx-auto bg-white border-t border-gray-200 h-16">
+          <div
+            className="flex flex-col items-center justify-center cursor-pointer"
+            onClick={handleInboxClick}
+          >
+            <svg
+              viewBox="0 0 90 90"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+              className="w-8 h-8 pb-3 text-black"
+            >
+              <path d="M60.66,39.31H29.341c-2.063,0-3.735-1.672-3.735-3.735c0-2.063,1.672-3.735,3.735-3.735H60.66 c2.062,0,3.735,1.672,3.735,3.735C64.395,37.638,62.722,39.31,60.66,39.31z" />
+              <path d="M45,90c-0.991,0-1.94-0.394-2.64-1.094L24.603,71.15H5.853 c-2.063,0-3.735-1.673-3.735-3.735V3.735C2.118,1.672,3.79,0,5.853,0h78.294 c2.062,0,3.735,1.672,3.735,3.735v63.681c0,2.062-1.673,3.735-3.735,3.735H65.397 L47.64,88.906C46.94,89.606,45.991,90,45,90z M9.587,63.681h16.564c0.991,0,1.94,0.394,2.64,1.094L45,80.985l16.21-16.21 c0.7-0.7,1.651-1.094,2.64-1.094h16.562V7.469H9.587v56.212z" />
+            </svg>
+            <span className="text-base text-black -mt-2">Inbox</span>
+          </div>
         </div>
-      </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="w-11/12 max-w-sm p-6 bg-white rounded-2xl shadow-xl flex flex-col items-center text-center">
