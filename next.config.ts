@@ -2,8 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   output: "export",
-  basePath: "/tiktokdata",
-  assetPrefix: "/tiktokdata",
+  basePath: "/TikTokData",
+  assetPrefix: "/TikTokData",
   images: {
     unoptimized: true,
   },
