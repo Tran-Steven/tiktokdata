@@ -11,9 +11,21 @@ interface ChatData {
   [username: string]: ChatMessage[];
 }
 
-function isLink(content: string) {
-  const urlPattern = /^(https?:\/\/|www\.)/i;
-  return urlPattern.test(content.trim());
+function isBracketedGifLink(content: string) {
+  return content.trim().startsWith("[https://");
+}
+
+function extractLinkFromBracketed(content: string) {
+  const match = content.match(/\[(https?:\/\/[^\]]+)\]/i);
+  return match ? match[1] : content;
+}
+
+function isTikTokLink(url: string) {
+  const lower = url.trim().toLowerCase();
+  return (
+    lower.startsWith("https://www.tiktok") ||
+    lower.startsWith("https://www.tiktokv")
+  );
 }
 
 export default function TikTokDMViewer() {
@@ -45,9 +57,9 @@ export default function TikTokDMViewer() {
           data?.["Direct Message"]?.["Direct Messages"]?.["ChatHistory"];
         if (!chats) throw new Error();
         const cleaned: ChatData = {};
-        Object.entries(chats).forEach(([k, v]) => {
-          const user = k.replace(/^Chat History with /, "").replace(/:$/, "");
-          cleaned[user] = v as ChatMessage[];
+        Object.entries(chats).forEach(([key, val]) => {
+          const user = key.replace(/^Chat History with /, "").replace(/:$/, "");
+          cleaned[user] = val as ChatMessage[];
         });
         setMessages(cleaned);
         setFileName(file.name);
@@ -67,13 +79,22 @@ export default function TikTokDMViewer() {
         }).format(date);
   }
 
+  function isLink(content: string) {
+    const trimmed = content.trim().toLowerCase();
+    return (
+      trimmed.startsWith("https://") ||
+      trimmed.startsWith("http://") ||
+      trimmed.startsWith("www.")
+    );
+  }
+
   const filtered = useMemo(() => {
     if (!messages) return [];
     if (!searchTerm.trim()) return Object.entries(messages);
     const s = searchTerm.toLowerCase();
-    return Object.entries(messages).filter(([u, arr]) => {
-      if (u.toLowerCase().includes(s)) return true;
-      return arr.some((m) => m.Content.toLowerCase().includes(s));
+    return Object.entries(messages).filter(([username, arr]) => {
+      if (username.toLowerCase().includes(s)) return true;
+      return arr.some((msg) => msg.Content.toLowerCase().includes(s));
     });
   }, [messages, searchTerm]);
 
@@ -83,18 +104,16 @@ export default function TikTokDMViewer() {
         <p className="text-gray-500 mt-6 text-center">No messages found</p>
       );
     }
-
     const sorted = [...filtered].sort((a, b) => {
       const aLast = a[1][a[1].length - 1]?.Date || "";
       const bLast = b[1][b[1].length - 1]?.Date || "";
       return new Date(bLast).getTime() - new Date(aLast).getTime();
     });
-
-    return sorted.map(([u, c], i) => (
+    return sorted.map(([username, chatMessages], i) => (
       <div
         key={i}
         className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer"
-        onClick={() => setSelectedChat(u)}
+        onClick={() => setSelectedChat(username)}
       >
         <div className="w-12 h-12 rounded-full bg-gray-300 flex justify-center items-center mr-3">
           <svg
@@ -106,13 +125,13 @@ export default function TikTokDMViewer() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold truncate">{u}</h2>
+          <h2 className="font-semibold truncate">{username}</h2>
           <p className="text-gray-500 text-sm truncate">
-            {c[c.length - 1]?.Content ?? "No content"}
+            {chatMessages[chatMessages.length - 1]?.Content ?? "No content"}
           </p>
         </div>
         <span className="text-xs text-gray-400">
-          {formatDate(c[c.length - 1]?.Date)}
+          {formatDate(chatMessages[chatMessages.length - 1]?.Date)}
         </span>
       </div>
     ));
@@ -143,66 +162,143 @@ export default function TikTokDMViewer() {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-2"
         >
-          {arr.map((m, i) => {
-            const isUser = m.From !== selectedChat;
-            const link = /^https?:\/\/|^www\./i.test(m.Content.trim());
-            const stamp = isUser ? "text-white" : "text-gray-500";
+          {arr.map((msg, i) => {
+            const isUser = msg.From !== selectedChat;
+            const side = isUser ? "justify-end" : "justify-start";
+            const bubbleColor = isUser
+              ? "bg-[#1092d6] text-white"
+              : "bg-white text-black";
+            const textColor = isUser ? "text-white" : "text-gray-500";
+
+            if (isBracketedGifLink(msg.Content)) {
+              const link = extractLinkFromBracketed(msg.Content);
+              return (
+                <div key={i} className={`flex items-end gap-2 ${side}`}>
+                  {!isUser && (
+                    <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
+                      <svg
+                        className="w-5 h-5 text-gray-500"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div>
+                    <img
+                      src={link}
+                      alt="gif"
+                      className="rounded-md max-w-[200px] h-auto mb-1"
+                    />
+                    <span className={`block text-xs ${textColor}`}>
+                      {formatDate(msg.Date)}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (isLink(msg.Content)) {
+              if (isTikTokLink(msg.Content)) {
+                return (
+                  <div key={i} className={`flex items-end gap-2 ${side}`}>
+                    {!isUser && (
+                      <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
+                        <svg
+                          className="w-5 h-5 text-gray-500"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex flex-col items-start">
+                      <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
+                        <a
+                          href={msg.Content.trim()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute inset-0 flex items-center justify-center"
+                        >
+                          <svg
+                            className="w-10 h-10 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </a>
+                      </div>
+                      <a
+                        href={msg.Content.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-black underline break-all mb-1 max-w-[200px]"
+                      >
+                        {msg.Content}
+                      </a>
+                      <span className="text-xs text-black">
+                        {formatDate(msg.Date)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div key={i} className={`flex items-end gap-2 ${side}`}>
+                  {!isUser && (
+                    <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
+                      <svg
+                        className="w-5 h-5 text-gray-500"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex flex-col items-start">
+                    <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
+                      <svg
+                        className="w-12 h-12 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                    <p className="text-xs break-words whitespace-pre-wrap mb-1 max-w-[200px]">
+                      {msg.Content}
+                    </p>
+                    <span className={`block text-xs ${textColor}`}>
+                      {formatDate(msg.Date)}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
             return (
-              <div
-                key={i}
-                className={`flex items-end gap-2 ${
-                  isUser ? "justify-end" : "justify-start"
-                }`}
-              >
+              <div key={i} className={`flex items-end gap-2 ${side}`}>
                 {!isUser && (
-                  <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-300 flex justify-center items-center">
+                  <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
                     <svg
                       className="w-5 h-5 text-gray-500"
-                      viewBox="0 0 24 24"
                       fill="currentColor"
+                      viewBox="0 0 24 24"
                     >
                       <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
                     </svg>
                   </div>
                 )}
                 <div
-                  className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${
-                    isUser
-                      ? "bg-[#1092d6] text-white self-end"
-                      : "bg-white text-black"
-                  }`}
+                  className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${bubbleColor}`}
                 >
-                  {link ? (
-                    <div>
-                      <div className="relative w-44 h-72 bg-black rounded-md flex items-center justify-center mb-2">
-                        <svg
-                          className="w-12 h-12 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                        <div className="absolute left-2 bottom-2 text-white">
-                          <svg
-                            className="w-6 h-6"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                          >
-                            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className="text-xs break-words whitespace-pre-wrap">
-                        {m.Content}
-                      </p>
-                    </div>
-                  ) : (
-                    <span className="break-words whitespace-pre-wrap">
-                      {m.Content}
-                    </span>
-                  )}
-                  <span className={`block text-xs mt-1 ${stamp}`}>
-                    {formatDate(m.Date)}
+                  {msg.Content}
+                  <span className={`block text-xs mt-1 ${textColor}`}>
+                    {formatDate(msg.Date)}
                   </span>
                 </div>
               </div>
@@ -210,7 +306,7 @@ export default function TikTokDMViewer() {
           })}
         </div>
         <div className="p-4 flex items-center bg-[#f8f8f8]">
-          <div className="flex-1 p-3 rounded-full bg-white text-sm text-gray-400 pointer-events-none select-none">
+          <div className="flex-1 rounded-full bg-white text-sm text-gray-400 pointer-events-none select-none px-3 py-2">
             Message...
           </div>
         </div>
