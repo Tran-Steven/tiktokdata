@@ -2,6 +2,11 @@
 
 Import your TikTok JSON Data and display your DM Conversations in a TikTok-like UI.
 
+
+# How To Use
+
+Please follow [TikTok's Guide](https://support.tiktok.com/en/account-and-privacy/personalized-ads-and-data/requesting-your-data) on how to request your data and make sure to select the JSON option.
+
 ## Data Limitations
 
 TikTok's exported data has some constraints. When a TikTok video is shared in a DM, the JSON file only contains the message text, not the attached video. As a result, some conversations may appear incomplete or out of context. This is due to TikTok’s data structure, and there is no fix unless TikTok includes this information in future exports.
