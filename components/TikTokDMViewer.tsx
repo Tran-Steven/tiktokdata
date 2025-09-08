@@ -355,12 +355,10 @@ export default function TikTokDMViewer() {
   }, [selectedChat, messages]);
 
   function handleInboxClick() {
-    // Force jump to top (no smooth)
+
     if (inboxContainerRef.current) {
       inboxContainerRef.current.scrollTop = 0;
     }
-    // If you'd rather try smooth scrolling:
-    // inboxContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -420,14 +418,6 @@ export default function TikTokDMViewer() {
             </div>
           </div>
 
-          {/*
-            This is the scrollable inbox area.
-            We force a fixed height so it actually can scroll.
-            h-[calc(100vh-3.5rem-4rem)] => for example:
-            - 3.5rem might be your header height
-            - 4rem might be your bottom bar
-            Adjust to suit your own layout or screen design
-          */}
           <div
             ref={inboxContainerRef}
             className="overflow-y-auto w-full flex-grow h-[calc(100vh-3.5rem-4rem)]"
