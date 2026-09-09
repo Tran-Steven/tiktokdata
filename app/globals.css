@@ -43,6 +43,24 @@
   --foreground: #171717;
 }
 
+.font-display {
+  font-family: "TikTokDisplay", sans-serif;
+}
+
+.font-text {
+  font-family: "TikTokText", sans-serif;
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1s linear infinite;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

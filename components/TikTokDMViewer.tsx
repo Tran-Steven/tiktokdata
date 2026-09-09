@@ -1,5 +1,12 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
+import {
+  TIMEZONE_OPTIONS,
+  TimezoneId,
+  formatTimestamp,
+  getDayKey,
+  parseUtc,
+} from "@/lib/datetime";
 
 interface ChatMessage {
   From: string;
@@ -10,6 +17,8 @@ interface ChatMessage {
 interface ChatData {
   [username: string]: ChatMessage[];
 }
+
+const TIMEZONE_STORAGE_KEY = "tiktokdata:timezone";
 
 function isBracketedGifLink(content: string) {
   return content.trim().startsWith("[https://");
@@ -29,6 +38,39 @@ function isTikTokLink(url: string) {
   );
 }
 
+// Deterministic color per username so avatars stay stable across renders.
+function avatarColor(username: string) {
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return `hsl(${Math.abs(hash) % 360}, 55%, 60%)`;
+}
+
+function avatarInitials(username: string) {
+  const parts = username.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function Avatar({
+  username,
+  className,
+}: Readonly<{
+  username: string;
+  className: string;
+}>) {
+  return (
+    <div
+      className={`rounded-full flex justify-center items-center font-semibold text-white shrink-0 ${className}`}
+      style={{ backgroundColor: avatarColor(username) }}
+    >
+      {avatarInitials(username)}
+    </div>
+  );
+}
+
 export default function TikTokDMViewer() {
   const [messages, setMessages] = useState<ChatData | null>(null);
   const [showModal, setShowModal] = useState(true);
@@ -36,9 +78,22 @@ export default function TikTokDMViewer() {
   const [fileName, setFileName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [timeZone, setTimeZone] = useState<TimezoneId>("system");
+  const [isTzMenuOpen, setIsTzMenuOpen] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inboxContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(TIMEZONE_STORAGE_KEY);
+    if (stored) setTimeZone(stored as TimezoneId);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(TIMEZONE_STORAGE_KEY, timeZone);
+  }, [timeZone]);
 
   useEffect(() => {
     if (selectedChat && chatContainerRef.current) {
@@ -52,34 +107,39 @@ export default function TikTokDMViewer() {
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    setIsParsing(true);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target?.result as string);
-        const chats =
-          data?.["Direct Message"]?.["Direct Messages"]?.["ChatHistory"];
-        if (!chats) throw new Error();
-        const cleaned: ChatData = {};
-        Object.entries(chats).forEach(([k, v]) => {
-          const user = k.replace(/^Chat History with /, "").replace(/:$/, "");
-          cleaned[user] = v as ChatMessage[];
-        });
-        setMessages(cleaned);
-        setFileName(file.name);
-        setShowModal(false);
-      } catch {}
+      const text = ev.target?.result as string;
+      const worker = new Worker("/parseTikTokData.worker.js");
+      worker.onmessage = (msg: MessageEvent<{ ok: boolean; chats?: ChatData; error?: string }>) => {
+        if (msg.data.ok && msg.data.chats) {
+          setMessages(msg.data.chats);
+          setFileName(file.name);
+          setShowModal(false);
+        } else {
+          setUploadError(msg.data.error || "This file couldn't be read.");
+        }
+        setIsParsing(false);
+        worker.terminate();
+      };
+      worker.onerror = () => {
+        setUploadError("This file couldn't be read.");
+        setIsParsing(false);
+        worker.terminate();
+      };
+      worker.postMessage(text);
+    };
+    reader.onerror = () => {
+      setUploadError("This file couldn't be read.");
+      setIsParsing(false);
     };
     reader.readAsText(file);
   }
 
   function formatDate(d: string) {
-    const date = new Date(d);
-    return isNaN(date.getTime())
-      ? "Unknown"
-      : new Intl.DateTimeFormat("en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(date);
+    return formatTimestamp(d, timeZone);
   }
 
   function isLink(content: string) {
@@ -109,7 +169,7 @@ export default function TikTokDMViewer() {
     const sorted = [...filtered].sort((a, b) => {
       const aLast = a[1][a[1].length - 1]?.Date || "";
       const bLast = b[1][b[1].length - 1]?.Date || "";
-      return new Date(bLast).getTime() - new Date(aLast).getTime();
+      return parseUtc(bLast).getTime() - parseUtc(aLast).getTime();
     });
     return sorted.map(([username, chatMessages], i) => (
       <div
@@ -117,18 +177,10 @@ export default function TikTokDMViewer() {
         className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer"
         onClick={() => setSelectedChat(username)}
       >
-        <div className="w-12 h-12 rounded-full bg-gray-300 flex justify-center items-center mr-3">
-          <svg
-            className="w-8 h-8 text-gray-500"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-          </svg>
-        </div>
+        <Avatar username={username} className="w-12 h-12 mr-3" />
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold truncate">{username}</h2>
-          <p className="text-gray-500 text-sm truncate">
+          <h2 className="font-semibold truncate font-display">{username}</h2>
+          <p className="text-gray-500 text-sm truncate font-text">
             {chatMessages[chatMessages.length - 1]?.Content ?? "No content"}
           </p>
         </div>
@@ -137,7 +189,7 @@ export default function TikTokDMViewer() {
         </span>
       </div>
     ));
-  }, [filtered, messages]);
+  }, [filtered, messages, timeZone]);
 
   const chatView = useMemo(() => {
     if (!selectedChat || !messages) return null;
@@ -160,16 +212,8 @@ export default function TikTokDMViewer() {
             </svg>
           </button>
           <div className="flex items-center ml-2">
-            <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center mr-2">
-              <svg
-                className="w-5 h-5 text-gray-500"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-              </svg>
-            </div>
-            <h2 className="text-sm font-semibold">{selectedChat}</h2>
+            <Avatar username={selectedChat} className="w-8 h-8 mr-2 text-xs" />
+            <h2 className="text-sm font-semibold font-display">{selectedChat}</h2>
           </div>
           <div className="flex items-center ml-auto space-x-4">
             <svg
@@ -200,34 +244,34 @@ export default function TikTokDMViewer() {
             const bubbleColor = isUser
               ? "bg-[#1092d6] text-white"
               : "bg-white text-black";
+            const prev = arr[i - 1];
+            const showDivider =
+              !prev ||
+              getDayKey(msg.Date, timeZone) !== getDayKey(prev.Date, timeZone) ||
+              Math.abs(parseUtc(msg.Date).getTime() - parseUtc(prev.Date).getTime()) >
+                5 * 60 * 1000;
+            const divider = showDivider ? (
+              <div
+                key={`divider-${i}`}
+                className="text-center text-xs text-gray-400 py-2"
+              >
+                {formatTimestamp(msg.Date, timeZone, "divider")}
+              </div>
+            ) : null;
             if (isBracketedGifLink(msg.Content)) {
               const link = extractLinkFromBracketed(msg.Content);
               return (
-                <div key={i} className={`flex items-end gap-2 ${side}`}>
-                  {!isUser && (
-                    <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
-                      <svg
-                        className="w-5 h-5 text-gray-500"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-                      </svg>
-                    </div>
-                  )}
-                  <div>
+                <div key={i}>
+                  {divider}
+                  <div className={`flex items-end gap-2 ${side}`}>
+                    {!isUser && (
+                      <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                    )}
                     <img
                       src={link}
                       alt="gif"
-                      className="rounded-md max-w-[200px] h-auto mb-1"
+                      className="rounded-md max-w-[200px] h-auto"
                     />
-                    <span
-                      className={`block text-xs ${
-                        isUser ? "text-white" : "text-gray-500"
-                      }`}
-                    >
-                      {formatDate(msg.Date)}
-                    </span>
                   </div>
                 </div>
               );
@@ -235,124 +279,123 @@ export default function TikTokDMViewer() {
             if (isLink(msg.Content)) {
               if (isTikTokLink(msg.Content)) {
                 return (
-                  <div key={i} className={`flex items-end gap-2 ${side}`}>
-                    {!isUser && (
-                      <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
-                        <svg
-                          className="w-5 h-5 text-gray-500"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="flex flex-col items-start">
-                      <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
+                  <div key={i}>
+                    {divider}
+                    <div className={`flex items-end gap-2 ${side}`}>
+                      {!isUser && (
+                        <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                      )}
+                      <div className="flex flex-col items-start">
+                        <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
+                          <a
+                            href={msg.Content.trim()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 flex items-center justify-center"
+                          >
+                            <svg
+                              className="w-10 h-10 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </a>
+                        </div>
                         <a
                           href={msg.Content.trim()}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="absolute inset-0 flex items-center justify-center"
+                          className="text-xs text-black underline break-all max-w-[200px]"
                         >
-                          <svg
-                            className="w-10 h-10 text-white"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
+                          {msg.Content}
                         </a>
                       </div>
-                      <a
-                        href={msg.Content.trim()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-black underline break-all mb-1 max-w-[200px]"
-                      >
-                        {msg.Content}
-                      </a>
-                      <span className="text-xs text-black">
-                        {formatDate(msg.Date)}
-                      </span>
                     </div>
                   </div>
                 );
               }
               return (
-                <div key={i} className={`flex items-end gap-2 ${side}`}>
-                  {!isUser && (
-                    <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
-                      <svg
-                        className="w-5 h-5 text-gray-500"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-                      </svg>
+                <div key={i}>
+                  {divider}
+                  <div className={`flex items-end gap-2 ${side}`}>
+                    {!isUser && (
+                      <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                    )}
+                    <div className="flex flex-col items-start">
+                      <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
+                        <svg
+                          className="w-12 h-12 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs break-words whitespace-pre-wrap max-w-[200px]">
+                        {msg.Content}
+                      </p>
                     </div>
-                  )}
-                  <div className="flex flex-col items-start">
-                    <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
-                      <svg
-                        className="w-12 h-12 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                    <p className="text-xs break-words whitespace-pre-wrap mb-1 max-w-[200px]">
-                      {msg.Content}
-                    </p>
-                    <span
-                      className={`block text-xs ${
-                        isUser ? "text-white" : "text-gray-500"
-                      }`}
-                    >
-                      {formatDate(msg.Date)}
-                    </span>
                   </div>
                 </div>
               );
             }
             return (
-              <div key={i} className={`flex items-end gap-2 ${side}`}>
-                {!isUser && (
-                  <div className="w-8 h-8 rounded-full bg-gray-300 flex justify-center items-center">
-                    <svg
-                      className="w-5 h-5 text-gray-500"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M12 2a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 16c4.67 0 8 2.33 8 4v2H4v-2c0-1.67 3.33-4 8-4z" />
-                    </svg>
-                  </div>
-                )}
-                <div
-                  className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${bubbleColor}`}
-                >
-                  {msg.Content}
-                  <span
-                    className={`block text-xs mt-1 ${
-                      isUser ? "text-white" : "text-gray-500"
-                    }`}
+              <div key={i}>
+                {divider}
+                <div className={`flex items-end gap-2 ${side}`}>
+                  {!isUser && (
+                    <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                  )}
+                  <div
+                    className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm font-text break-words whitespace-pre-wrap ${bubbleColor}`}
                   >
-                    {formatDate(msg.Date)}
-                  </span>
+                    {msg.Content}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="p-4 flex items-center bg-[#f8f8f8]">
+        <div className="p-3 flex items-center gap-2 bg-[#f8f8f8]">
+          <button
+            type="button"
+            disabled
+            title="Read-only viewer"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 cursor-not-allowed shrink-0"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+            </svg>
+          </button>
           <div className="flex-1 rounded-full bg-white text-sm text-gray-400 pointer-events-none select-none px-3 py-2">
             Message...
           </div>
+          <button
+            type="button"
+            disabled
+            title="Read-only viewer"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 cursor-not-allowed shrink-0"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M4 4h16v12H7l-3 3V4z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Read-only viewer"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 cursor-not-allowed shrink-0"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2 12l20-8-8 20-3-8-9-4z" />
+            </svg>
+          </button>
         </div>
       </div>
     );
-  }, [selectedChat, messages]);
+  }, [selectedChat, messages, timeZone]);
+
 
   function handleInboxClick() {
 
@@ -380,8 +423,42 @@ export default function TikTokDMViewer() {
                   <path d="M5 8l.867-1.5A2 2 0 017.58 6h8.84a2 2 0 011.713.937L19 8h1a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2v-8a2 2 0 012-2h1zM12 17a3 3 0 100-6 3 3 0 000 6z" />
                 </svg>
               </div>
-              <h1 className="mx-auto text-lg font-bold">Inbox</h1>
-              <div className="absolute right-4">
+              <h1 className="mx-auto text-lg font-bold font-display">Inbox</h1>
+              <div className="absolute right-4 flex items-center gap-3">
+                <div className="relative">
+                  <svg
+                    onClick={() => setIsTzMenuOpen((v) => !v)}
+                    className="w-5 h-5 text-gray-500 cursor-pointer"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" strokeLinecap="round" />
+                  </svg>
+                  {isTzMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                      {TIMEZONE_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => {
+                            setTimeZone(opt.id);
+                            setIsTzMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                            timeZone === opt.id
+                              ? "font-semibold text-black"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <svg
                   onClick={() => setIsSearching(true)}
                   className="w-6 h-6 text-gray-500 cursor-pointer"
@@ -469,22 +546,42 @@ export default function TikTokDMViewer() {
                 View Code Repository and Privacy
               </a>
             </p>
-            <div className="relative w-full border-2 border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
-              <input
-                type="file"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={handleFileUpload}
-              />
-              <svg
-                className="w-12 h-12 text-gray-400 mb-2"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M16.5 2a1 1 0 01.94.66l1.02 2.72A1 1 0 0019.4 6h2.6a1 1 0 010 2h-1.4l-.45 8.16A4 4 0 0116.18 20H7.82A4 4 0 014.45 16.16L4 8H2a1 1 0 010-2h2.6a1 1 0 00.94-.66l1.02-2.72A1 1 0 017.5 2h9z" />
-              </svg>
-              <p className="text-gray-600">Tap or drag file here</p>
-            </div>
-            {fileName && (
+            {isParsing ? (
+              <div className="w-full py-10 flex flex-col items-center justify-center">
+                <svg
+                  className="w-10 h-10 text-[#1092d6] animate-spin-slow mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 3a9 9 0 109 9" strokeLinecap="round" />
+                </svg>
+                <p className="text-gray-600 text-sm">
+                  Processing your data…
+                </p>
+              </div>
+            ) : (
+              <div className="relative w-full border-2 border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
+                <input
+                  type="file"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleFileUpload}
+                />
+                <svg
+                  className="w-12 h-12 text-gray-400 mb-2"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M16.5 2a1 1 0 01.94.66l1.02 2.72A1 1 0 0019.4 6h2.6a1 1 0 010 2h-1.4l-.45 8.16A4 4 0 0116.18 20H7.82A4 4 0 014.45 16.16L4 8H2a1 1 0 010-2h2.6a1 1 0 00.94-.66l1.02-2.72A1 1 0 017.5 2h9z" />
+                </svg>
+                <p className="text-gray-600">Tap or drag file here</p>
+              </div>
+            )}
+            {uploadError && (
+              <p className="text-sm text-red-500 mt-3">{uploadError}</p>
+            )}
+            {fileName && !uploadError && (
               <p className="text-sm text-gray-500 mt-3">{fileName}</p>
             )}
           </div>
@@ -493,3 +590,4 @@ export default function TikTokDMViewer() {
     </div>
   );
 }
+
