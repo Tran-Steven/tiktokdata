@@ -113,7 +113,9 @@ export default function TikTokDMViewer() {
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       const worker = new Worker("/parseTikTokData.worker.js");
-      worker.onmessage = (msg: MessageEvent<{ ok: boolean; chats?: ChatData; error?: string }>) => {
+      worker.onmessage = (
+        msg: MessageEvent<{ ok: boolean; chats?: ChatData; error?: string }>,
+      ) => {
         if (msg.data.ok && msg.data.chats) {
           setMessages(msg.data.chats);
           setFileName(file.name);
@@ -213,7 +215,9 @@ export default function TikTokDMViewer() {
           </button>
           <div className="flex items-center ml-2">
             <Avatar username={selectedChat} className="w-8 h-8 mr-2 text-xs" />
-            <h2 className="text-sm font-semibold font-display">{selectedChat}</h2>
+            <h2 className="text-sm font-semibold font-display">
+              {selectedChat}
+            </h2>
           </div>
           <div className="flex items-center ml-auto space-x-4">
             <svg
@@ -247,8 +251,11 @@ export default function TikTokDMViewer() {
             const prev = arr[i - 1];
             const showDivider =
               !prev ||
-              getDayKey(msg.Date, timeZone) !== getDayKey(prev.Date, timeZone) ||
-              Math.abs(parseUtc(msg.Date).getTime() - parseUtc(prev.Date).getTime()) >
+              getDayKey(msg.Date, timeZone) !==
+                getDayKey(prev.Date, timeZone) ||
+              Math.abs(
+                parseUtc(msg.Date).getTime() - parseUtc(prev.Date).getTime(),
+              ) >
                 5 * 60 * 1000;
             const divider = showDivider ? (
               <div
@@ -265,7 +272,10 @@ export default function TikTokDMViewer() {
                   {divider}
                   <div className={`flex items-end gap-2 ${side}`}>
                     {!isUser && (
-                      <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                      <Avatar
+                        username={selectedChat}
+                        className="w-8 h-8 text-xs"
+                      />
                     )}
                     <img
                       src={link}
@@ -283,7 +293,10 @@ export default function TikTokDMViewer() {
                     {divider}
                     <div className={`flex items-end gap-2 ${side}`}>
                       {!isUser && (
-                        <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                        <Avatar
+                          username={selectedChat}
+                          className="w-8 h-8 text-xs"
+                        />
                       )}
                       <div className="flex flex-col items-start">
                         <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
@@ -320,7 +333,10 @@ export default function TikTokDMViewer() {
                   {divider}
                   <div className={`flex items-end gap-2 ${side}`}>
                     {!isUser && (
-                      <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                      <Avatar
+                        username={selectedChat}
+                        className="w-8 h-8 text-xs"
+                      />
                     )}
                     <div className="flex flex-col items-start">
                       <div className="relative w-[200px] h-[350px] bg-black rounded-md flex items-center justify-center mb-1">
@@ -345,7 +361,10 @@ export default function TikTokDMViewer() {
                 {divider}
                 <div className={`flex items-end gap-2 ${side}`}>
                   {!isUser && (
-                    <Avatar username={selectedChat} className="w-8 h-8 text-xs" />
+                    <Avatar
+                      username={selectedChat}
+                      className="w-8 h-8 text-xs"
+                    />
                   )}
                   <div
                     className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm font-text break-words whitespace-pre-wrap ${bubbleColor}`}
@@ -365,7 +384,13 @@ export default function TikTokDMViewer() {
             className="w-8 h-8 flex items-center justify-center text-gray-400 cursor-not-allowed shrink-0"
           >
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
           <div className="flex-1 rounded-full bg-white text-sm text-gray-400 pointer-events-none select-none px-3 py-2">
@@ -396,9 +421,7 @@ export default function TikTokDMViewer() {
     );
   }, [selectedChat, messages, timeZone]);
 
-
   function handleInboxClick() {
-
     if (inboxContainerRef.current) {
       inboxContainerRef.current.scrollTop = 0;
     }
@@ -557,9 +580,7 @@ export default function TikTokDMViewer() {
                 >
                   <path d="M12 3a9 9 0 109 9" strokeLinecap="round" />
                 </svg>
-                <p className="text-gray-600 text-sm">
-                  Processing your data…
-                </p>
+                <p className="text-gray-600 text-sm">Processing your data…</p>
               </div>
             ) : (
               <div className="relative w-full border-2 border-dashed border-gray-300 rounded-lg py-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
@@ -590,4 +611,3 @@ export default function TikTokDMViewer() {
     </div>
   );
 }
-
