@@ -111,27 +111,33 @@ export default function TikTokDMViewer() {
     setIsParsing(true);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const worker = new Worker("/parseTikTokData.worker.js");
-      worker.onmessage = (
-        msg: MessageEvent<{ ok: boolean; chats?: ChatData; error?: string }>,
-      ) => {
-        if (msg.data.ok && msg.data.chats) {
-          setMessages(msg.data.chats);
+      const text = (ev.target?.result as string) || "";
+      setTimeout(() => {
+        try {
+          const data = JSON.parse(text);
+          const chats =
+            data?.["Direct Message"]?.["Direct Messages"]?.["ChatHistory"];
+          if (!chats) {
+            throw new Error(
+              "Couldn't find chat history in this file. Make sure you uploaded your TikTok data export JSON.",
+            );
+          }
+          const cleaned: ChatData = {};
+          Object.entries(chats).forEach(([k, v]) => {
+            const user = k.replace(/^Chat History with /, "").replace(/:$/, "");
+            cleaned[user] = v as ChatMessage[];
+          });
+          setMessages(cleaned);
           setFileName(file.name);
           setShowModal(false);
-        } else {
-          setUploadError(msg.data.error || "This file couldn't be read.");
+        } catch (err) {
+          setUploadError(
+            err instanceof Error ? err.message : "This file couldn't be read.",
+          );
+        } finally {
+          setIsParsing(false);
         }
-        setIsParsing(false);
-        worker.terminate();
-      };
-      worker.onerror = () => {
-        setUploadError("This file couldn't be read.");
-        setIsParsing(false);
-        worker.terminate();
-      };
-      worker.postMessage(text);
+      }, 50);
     };
     reader.onerror = () => {
       setUploadError("This file couldn't be read.");
